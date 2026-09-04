@@ -1,0 +1,236 @@
+.TH RMU 1 "2026-09-04" "rmu 0.7.1" "User Commands"
+.SH NAME
+rmu \- move files into the FreeDesktop Trash with GNU rm-compatible arguments
+.SH SYNOPSIS
+.B rmu
+.RI [ OPTION ]...\ [ FILE ]...
+.SH DESCRIPTION
+.B rmu
+accepts GNU
+.BR rm (1)
+arguments but, by default, moves each top-level operand into the FreeDesktop
+Trash used by Linux desktop environments.  Files remain recoverable through
+the desktop or
+.BR rmuctl (1).
+.PP
+.B \-\-delegate
+or
+.B RMU_MODE=delegate
+selects exact GNU delegation. RMU removes its own mode selectors, verifies
+a GNU coreutils
+.BR rm ,
+and replaces itself with that executable. GNU rm therefore owns parsing,
+prompts, traversal, diagnostics, signals, and exit status in delegate mode.
+.PP
+There is one deliberate exception:
+.B \-d
+permanently removes an empty directory with the kernel's atomic directory
+removal operation, as GNU rm does.  Use
+.B \-r
+if the directory itself should remain recoverable.
+.PP
+No Trash-mode failure falls back to permanent deletion.  A compatible Trash
+must be on the same mount as the operand so that publication can use an atomic
+rename.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-force
+Ignore nonexistent operands and a missing operand, and never prompt.  Like GNU
+rm, a later
+.B \-i
+or
+.B \-I
+can change the prompt policy.
+.TP
+.B \-i
+Prompt before each top-level operand.
+.TP
+.B \-I
+Prompt once before processing more than three operands, or before a recursive
+operation.
+.TP
+.BR \-\-interactive [= WHEN ]
+Set the prompt policy to
+.BR never ,
+.BR once ,
+or
+.BR always .
+Without a value, use
+.BR always .
+.TP
+.BR \-d ", " \-\-dir
+Permanently remove an empty directory.  A nonempty directory is refused unless
+.B \-r
+is also present.
+.TP
+.B \-\-one-file-system
+Refuse a directory operand as a whole if it contains a nested mount.  rmu
+does not create a partially trashed tree.
+.TP
+.B \-\-no-preserve-root
+Disable the GNU rm root policy.  The filesystem root still cannot be moved
+into Trash.  As with GNU rm, this option may not be abbreviated.
+.TP
+.BR \-\-preserve-root [= all ]
+Do not remove
+.BR / .
+With
+.BR all ,
+also reject an operand on a different filesystem from its parent.
+.TP
+.BR \-r ", " \-R ", " \-\-recursive
+Allow directory operands.  Each accepted top-level directory is moved as one
+recoverable item rather than unlinked descendant by descendant.
+.TP
+.BR \-v ", " \-\-verbose
+Explain successful actions.
+.TP
+.B \-\-trash
+Explicitly select the default recoverable Trash mode. The last mode selector
+wins and command-line mode selection overrides
+.BR RMU_MODE .
+.TP
+.B \-\-delegate
+Delegate every remaining argument to verified GNU coreutils
+.BR rm .
+RMU's Trash and progress enhancements do not apply.
+.TP
+.BR \-\-rmu-progress [= WHEN ]
+Show tree totals, item and byte rates, an ETA when exact totals are available,
+move status, and a final summary.  WHEN is
+.BR auto ,
+.BR always ,
+or
+.BR never ;
+the option without a value means
+.BR auto .
+.TP
+.B \-\-help
+Display help and exit.
+.TP
+.B \-\-version
+Display version information and exit.
+.SH ENVIRONMENT
+.TP
+.B RMU_MODE
+Select the default operation mode:
+.B trash
+or
+.BR delegate .
+Trash is the default, and an explicit mode option takes precedence. Because
+.B delegate
+hands every affected invocation to destructive GNU rm, prefer the visible
+command-line option unless persistent delegation is genuinely intended.
+.TP
+.B RMU_GNU_RM
+Override the GNU coreutils
+.B rm
+executable used by delegate mode and the differential tests. A non-GNU
+implementation and a path resolving back to RMU are refused.
+.TP
+.B RMU_PROGRESS
+Default progress policy:
+.BR never ,
+.BR auto ,
+or
+.BR always .
+An explicit command-line option takes precedence. In Trash mode, no environment
+variable can enable force or change confirmation policy.
+.TP
+.B POSIXLY_CORRECT
+When present, stop option parsing at the first operand, matching GNU rm's
+environment-sensitive ordering.  A later option-looking word is an operand.
+.TP
+.B XDG_DATA_HOME
+Selects the home-filesystem Trash as
+.IR $XDG_DATA_HOME/Trash .
+.TP
+.B HOME
+When
+.B XDG_DATA_HOME
+is unset, the home-filesystem Trash is
+.IR $HOME/.local/share/Trash .
+.SH TRASH LOCATIONS
+For an operand on the home filesystem, rmu uses the XDG data Trash.  On
+another mounted filesystem it uses a valid shared
+.IR .Trash/UID
+directory or the private
+.IR .Trash-UID
+fallback required by the FreeDesktop Trash Specification.  Existing Trash
+directories are validated before use.
+.PP
+Each payload has a matching
+.I .trashinfo
+record containing the encoded original path and local deletion time.  Directory
+sizes are recorded in the optional FreeDesktop
+.I directorysizes
+cache.
+.SH PROGRESS AND SUMMARIES
+Progress performs an additional counting pass over directory trees.  Exact
+totals and ETA are shown only when the entire tree is readable.  Otherwise
+counts are labelled as lower bounds and the summary is marked incomplete.
+Allocated bytes are reported, hard-linked inodes are counted once, and the
+final summary distinguishes failed operands from skipped operands.
+.PP
+The scanner requires a mounted Linux
+.I /proc
+filesystem.  If scanning is unavailable, the top-level Trash move can still
+succeed, but optional size and progress information can be incomplete.
+.SH EXIT STATUS
+.TP
+.B 0
+All requested operations succeeded, or force made a missing operand ignorable.
+.TP
+.B 1
+At least one operand failed or was refused, or the command line or environment
+setting was invalid.
+.PP
+Delegate mode returns GNU rm's exit status because RMU replaces itself with
+that process.
+.PP
+In Trash mode, a non-interactive output failure is recorded while later
+operands continue to be processed; the command then exits nonzero.  This keeps
+requested recoverable moves from being abandoned when an output pipe closes.
+GNU rm may instead terminate on
+.BR SIGPIPE .
+Delegate mode retains GNU rm's behavior.
+.SH NOTES
+GNU rm recursively unlinks descendants.  rmu instead moves each top-level
+directory as one Trash entry.  Per-descendant prompts and verbose output
+therefore do not apply.
+.PP
+A trailing-slash symlink is refused without following it.  A source reached
+through a separate bind mount of the home filesystem is refused until a safe
+copy fallback exists.  Do not empty the desktop Trash concurrently with an
+active rmu operation.
+.PP
+Trash-mode diagnostics and prompts are English.  Dynamically linked glibc
+builds use the locale's affirmative-response expression; static musl releases
+accept ASCII
+.B y
+or
+.BR yes .
+Delegate mode retains GNU rm's own localization and response handling.
+.SH EXAMPLES
+.TP
+.B rmu file.txt
+Move a file into the desktop Trash.
+.TP
+.B rmu --trash file.txt
+Make the default recoverable mode explicit.
+.TP
+.B rmu --delegate -r build-directory
+Replace RMU with GNU rm and permanently remove the directory using GNU's exact
+behavior.
+.TP
+.B rmu -r --rmu-progress large-tree
+Move a directory as one item while reporting scan and move progress.
+.TP
+.B rmu -d empty-directory
+Permanently remove an empty directory.
+.SH SEE ALSO
+.BR rm (1),
+.BR rmuctl (1)
+.UR https://specifications.freedesktop.org/trash/latest/
+FreeDesktop Trash Specification 1.0
+.UE

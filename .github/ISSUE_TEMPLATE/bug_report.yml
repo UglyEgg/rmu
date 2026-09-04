@@ -1,0 +1,90 @@
+name: Bug report
+description: Report incorrect RMU behavior that is not security-sensitive
+title: "[Bug]: "
+labels:
+  - bug
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve RMU. Use only disposable files when reproducing a problem.
+        Report vulnerabilities and potential data-loss paths privately through the Security tab.
+
+  - type: input
+    id: version
+    attributes:
+      label: RMU version
+      description: Paste the output of `rmu --version` or `rmuctl --version`.
+      placeholder: rmu 0.7.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - RPM package
+        - DEB package
+        - Static musl archive
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: Linux environment
+      description: Include distribution, kernel, filesystem, and relevant mount layout.
+      placeholder: Fedora 44, Linux 7.1, Btrfs home filesystem
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and environment
+      description: Redact private path components, but preserve quoting and option order.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect RMU to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the complete diagnostic after removing sensitive information.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Disposable reproduction
+      description: Provide the smallest reproduction that uses no valuable files or real Trash contents.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add logs, screenshots, or related issues if they help. Check every attachment for sensitive paths.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I reproduced this with disposable data and removed sensitive paths or Trash contents.
+          required: true
+        - label: This report does not describe a vulnerability or a potential data-loss path.
+          required: true

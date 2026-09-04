@@ -1,0 +1,95 @@
+ARG PACKAGE_IMAGE=docker.io/library/rust@sha256:7bae7c67364dad5ebbd4060923b34d734fbed66d7c1cf3af72aa2f062af93eb6
+FROM ${PACKAGE_IMAGE} AS packager
+
+ARG PACKAGE_IMAGE
+ARG RUSTC_VERSION
+ARG MUSL_VERSION=1.2.5-r11
+ARG RMU_VERSION
+ARG RMU_RELEASE=1
+ARG RMU_ARCHITECTURE
+ARG RMU_MAINTAINER
+ARG SOURCE_DATE_EPOCH
+
+ARG COREUTILS_VERSION=9.5-r2
+ARG DPKG_VERSION=1.22.11-r0
+ARG FILE_VERSION=5.46-r2
+ARG FISH_VERSION=3.7.1-r0
+ARG GZIP_VERSION=1.13-r1
+ARG MANDOC_VERSION=1.14.6-r13
+ARG RPM_VERSION=4.19.1.1-r1
+ARG ZSH_VERSION=5.9-r4
+
+RUN apk add --no-cache \
+        "acl-libs=2.3.2-r1" \
+        "bash=5.2.37-r0" \
+        "bc=1.07.1-r5" \
+        "coreutils=${COREUTILS_VERSION}" \
+        "coreutils-env=9.5-r2" \
+        "coreutils-fmt=9.5-r2" \
+        "coreutils-sha512sum=9.5-r2" \
+        "dpkg=${DPKG_VERSION}" \
+        "file=${FILE_VERSION}" \
+        "fish=${FISH_VERSION}" \
+        "gzip=${GZIP_VERSION}" \
+        "less=668-r0" \
+        "libarchive=3.8.3-r0" \
+        "libattr=2.5.2-r2" \
+        "libbz2=1.0.8-r6" \
+        "libcap2=2.78-r0" \
+        "libdw=0.191-r0" \
+        "libelf=0.191-r0" \
+        "libexpat=2.8.4-r0" \
+        "libintl=0.22.5-r0" \
+        "libmagic=5.46-r2" \
+        "libmd=1.1.0-r0" \
+        "libncursesw=6.5_p20241006-r3" \
+        "libpcre2-32=10.43-r0" \
+        "lua5.4-libs=5.4.7-r0" \
+        "lz4-libs=1.10.0-r0" \
+        "mandoc=${MANDOC_VERSION}" \
+        "musl-fts=1.2.7-r6" \
+        "ncurses-terminfo-base=6.5_p20241006-r3" \
+        "perl=5.40.4-r0" \
+        "popt=1.19-r4" \
+        "readline=8.2.13-r0" \
+        "rpm=${RPM_VERSION}" \
+        "rpm-scripts=4.19.1.1-r1" \
+        "skalibs-libs=2.14.3.0-r0" \
+        "sqlite-libs=3.48.0-r4" \
+        "tar=1.35-r2" \
+        "utmps-libs=0.1.2.3-r2" \
+        "xz=5.8.3-r0" \
+        "xz-libs=5.8.3-r0" \
+        "zsh=${ZSH_VERSION}" \
+    && test -n "$RUSTC_VERSION" \
+    && test -n "$SOURCE_DATE_EPOCH" \
+    && test "$(rustc --version | awk '{print $2}')" = "$RUSTC_VERSION" \
+    && apk info -e "musl=$MUSL_VERSION"
+
+WORKDIR /input
+COPY . .
+
+RUN mandoc -T lint man/rmu.1 man/rmuctl.1
+RUN set -eu; \
+    for completion in completions/rmu.bash completions/rmuctl.bash; do \
+        bash -n "$completion"; \
+    done; \
+    for completion in completions/_rmu completions/_rmuctl; do \
+        zsh -n "$completion"; \
+    done
+RUN set -eu; \
+    for completion in completions/rmu.fish completions/rmuctl.fish; do \
+        fish -n "$completion"; \
+    done
+RUN sh -n packaging/build-packages.sh \
+    && RMU_VERSION="$RMU_VERSION" \
+       RMU_RELEASE="$RMU_RELEASE" \
+       RMU_ARCHITECTURE="$RMU_ARCHITECTURE" \
+       RMU_MAINTAINER="$RMU_MAINTAINER" \
+       RUSTC_VERSION="$RUSTC_VERSION" \
+       SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+       PACKAGE_IMAGE="$PACKAGE_IMAGE" \
+       packaging/build-packages.sh
+
+FROM scratch AS artifact
+COPY --from=packager /artifacts /artifacts

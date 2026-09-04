@@ -1,0 +1,294 @@
+.TH RMUCTL 1 "2026-09-04" "rmu 0.7.1" "User Commands"
+.SH NAME
+rmuctl \- inspect, restore, and maintain the FreeDesktop Trash
+.SH SYNOPSIS
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B list
+.RI [ OPTION ]...
+.br
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B info
+.I ID...
+.br
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B restore
+.RI [ OPTION ]...
+.I ID...
+.br
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B purge
+.RI [ OPTION ]...
+.I ID...
+.br
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B empty
+.RI [ OPTION ]...
+.br
+.B rmuctl
+.RI [ GLOBAL-OPTION ]
+.B doctor
+.RI [ OPTION ]...
+.br
+.B rmuctl
+.B completions
+.I SHELL COMMAND
+.SH DESCRIPTION
+.B rmuctl
+is the stateless companion to
+.BR rmu (1).
+Trash-management commands discover and validate the standard home and
+mounted-filesystem Trash directories on every invocation. RMU has no daemon,
+database, private Trash location, or automatic-emptying policy.
+.PP
+Mutating commands identify entries by the stable IDs emitted by
+.BR list .
+An ID is exactly 32 lowercase hexadecimal characters.
+Each entry's root, payload, metadata, and incarnation are revalidated
+immediately before a change.  A previously printed ID is never treated as
+permanent authority.
+.SH GLOBAL OPTIONS
+Global options may appear before or after Trash-management commands. Output
+format and progress options are not accepted by
+.BR completions ;
+.B \-\-help
+and
+.B \-\-version
+are process-wide selectors recognized anywhere.
+.TP
+.B \-\-json
+Emit JSON or JSON Lines.  Path and name fields include authoritative lowercase
+hexadecimal byte companions for arbitrary Unix names.
+.TP
+.B \-\-null
+Terminate
+.B list
+records with NUL.  This option is valid only with
+.BR list .
+.TP
+.BR \-q ", " \-\-quiet
+Suppress successful action output.  Warnings and errors remain visible.
+.TP
+.B \-\-no-color
+Disable color.  Accepted for stable scripting; output is currently plain.
+.TP
+.B \-\-help
+Display help and exit.
+.TP
+.B \-\-version
+Display version information and exit.
+.SH COMMANDS
+.SS list
+List known entries with stable ID, deletion date, allocated size when known,
+health state, and original path.  Healthy rows are still emitted if another
+Trash root cannot be inspected, but the command warns and exits nonzero so a
+partial inventory cannot be mistaken for a complete one.
+.TP
+.BI \-\-filesystem " PATH"
+Select entries associated with PATH's filesystem.
+.TP
+.BI \-\-older-than " DURATION"
+Select entries older than DURATION.
+.TP
+.BI \-\-newer-than " DURATION"
+Select entries newer than DURATION.
+.TP
+.BI \-\-sort " FIELD"
+Sort by
+.BR name ,
+.BR date ,
+.BR size ,
+or
+.BR path .
+The default is date.
+.TP
+.B \-\-reverse
+Reverse the selected ordering.
+.SS info
+Show the original path, desktop metadata, payload location, allocated size,
+and structural problems for each selected ID.  At least one ID is required.
+.SS restore
+Restore healthy entries without overwriting an existing destination.
+.TP
+.BI \-\-to " DIRECTORY"
+Restore below DIRECTORY instead of the recorded original path.
+.TP
+.BI \-\-conflict " POLICY"
+Use
+.B fail
+(the default), or choose a new
+.I .restored.N
+name with
+.BR rename .
+.TP
+.B \-\-parents
+Create missing destination parents.
+.TP
+.B \-\-dry-run
+Report the planned destination without changing anything.
+.PP
+A cross-filesystem restore fails rather than silently copying.
+.SS purge
+Permanently remove the selected IDs.  At least one ID is required.  This
+command prompts unless standard input is not a terminal, in which case an
+explicit
+.B \-\-yes
+is required.
+.TP
+.B \-\-dry-run
+Report matching entries without prompting or changing anything.
+.TP
+.B \-\-yes
+Confirm permanent deletion noninteractively.
+.PP
+A directory payload containing a mounted filesystem boundary is refused.
+Mount identity is checked again during traversal so a newly introduced bind or
+filesystem mount is never traversed for deletion.
+.TP
+.BR \-\-progress [= WHEN ]
+Show the number of processed and selected entries.  WHEN is
+.BR auto ,
+.BR always ,
+or
+.BR never .
+.SS empty
+Permanently remove all selected entries, subject to optional filters.  It uses
+the same confirmation and progress options as
+.BR purge .
+.TP
+.BI \-\-filesystem " PATH"
+Restrict the operation to the Trash associated with PATH's filesystem.
+.TP
+.BI \-\-older-than " DURATION"
+Remove only entries older than DURATION.
+.TP
+.B \-\-dry-run
+List what would be removed without prompting or changing anything.
+.TP
+.B \-\-yes
+Confirm permanent deletion noninteractively.
+.TP
+.BR \-\-progress [= WHEN ]
+Show the number of processed and selected entries.
+.SS doctor
+Diagnose missing payload/metadata pairs, malformed metadata, unsafe roots,
+interrupted-operation quarantine files, and broken directory-size caches.
+With no repair option, doctor is read-only.
+Repair and recovery options are refused when Trash-root discovery is
+incomplete, and an incompletely enumerated root is never mutated.  A broken
+.I directorysizes
+cache is advisory: it produces a warning but does not make the authoritative
+payload and metadata inventory incomplete.  An explicit repair is permitted
+only when those namespaces were completely enumerated, and no replacement is
+published if any selected directory changes or cannot be counted completely.
+.TP
+.B \-\-repair-cache
+Atomically rebuild FreeDesktop
+.I directorysizes
+caches.  This does not delete orphaned data.
+.TP
+.BI \-\-recover-orphans " DIRECTORY"
+Move recoverable orphan data into DIRECTORY without overwriting.
+.TP
+.B \-\-dry-run
+Report repairs without changing anything.
+.SS completions
+Print exactly one shell completion definition to standard output without
+discovering or reading Trash.
+.I SHELL
+must be
+.BR bash ,
+.BR zsh ,
+or
+.BR fish .
+.I COMMAND
+must be
+.B rmu
+or
+.BR rmuctl .
+Packages install these definitions in each shell's standard system vendor
+directory; this command supports custom per-user completion layouts.
+.SH DURATION FORMAT
+Durations are a nonnegative integer followed by one suffix:
+.B w
+(weeks),
+.B d
+(days),
+.B h
+(hours),
+.B m
+(minutes), or
+.B s
+(seconds).  Examples are
+.BR 30d ,
+.BR 12h ,
+and
+.BR 90m .
+.SH ENVIRONMENT
+.TP
+.B RMU_PROGRESS
+Default progress policy for
+.B purge
+and
+.BR empty :
+.BR never ,
+.BR auto ,
+or
+.BR always .
+It is ignored by read-only commands and overridden by an explicit progress
+option.
+.PP
+No
+.B rmuctl
+environment variable can imply
+.BR \-\-yes ,
+permanent deletion, repair, recovery, conflict renaming, parent creation, or
+overwrite.
+.SH EXIT STATUS
+.TP
+.B 0
+The requested action succeeded and, when applicable, the Trash inventory was
+complete.  A successful doctor repair returns zero only when its post-action
+inventory has no unresolved problem.
+.TP
+.B 1
+Discovery or inventory was partial, confirmation was not given, a selected ID
+was ambiguous or stale for the requested action, an action failed, or the
+command line or environment setting was invalid. Merely listing or inspecting
+a known unhealthy entry does not itself change the exit status.  Doctor returns
+one when a problem remains unresolved or a repair action fails; an initial
+problem that was successfully repaired does not force a failure status.
+.SH EXAMPLES
+.TP
+.B rmuctl list --sort=size --reverse
+List the largest known Trash entries first.
+.TP
+.B rmuctl --json info ENTRY-ID
+Emit complete machine-readable information for one entry.
+.TP
+.B rmuctl restore --conflict=rename ENTRY-ID
+Restore without overwriting, choosing a new destination name if necessary.
+.TP
+.B rmuctl empty --older-than=30d --dry-run
+Preview removing Trash entries older than 30 days.
+.TP
+.B rmuctl empty --older-than=30d --yes --progress
+Perform that operation with progress and no prompt.
+.TP
+.B rmuctl completions zsh rmu > ~/.zfunc/_rmu
+Write the
+.B rmu
+definition into a custom Zsh completion directory.
+.TP
+.B rmuctl completions zsh rmuctl > ~/.zfunc/_rmuctl
+Write the companion command's definition into the same directory.
+.SH SEE ALSO
+.BR rmu (1),
+.BR rm (1)
+.UR https://specifications.freedesktop.org/trash/latest/
+FreeDesktop Trash Specification 1.0
+.UE

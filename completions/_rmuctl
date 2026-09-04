@@ -1,0 +1,84 @@
+#compdef rmuctl
+
+local command word
+local -i command_index index
+for (( index = 2; index <= CURRENT; index++ )); do
+  word=$words[index]
+  case $word in
+    list|info|restore|purge|empty|doctor|completions)
+      command=$word
+      command_index=$index
+      break
+      ;;
+  esac
+done
+
+local -a global_options
+global_options=(
+  '--json[emit JSON or JSON Lines]'
+  '(-q --quiet)'{-q,--quiet}'[suppress successful action output]'
+  '--no-color[disable color]'
+  '--help[display help and exit]'
+  '--version[display version and exit]'
+)
+
+if [[ -z $command ]]; then
+  _arguments -s -S \
+    $global_options \
+    '--null[terminate list records with NUL]' \
+    '1:command:((list\:list\ Trash\ entries info\:show\ entry\ details restore\:restore\ entries purge\:permanently\ remove\ entries empty\:empty\ Trash doctor\:diagnose\ Trash completions\:print\ shell\ completions))'
+  return
+fi
+
+words[command_index]=()
+(( CURRENT-- ))
+case $command in
+  list)
+    _arguments -s -S $global_options \
+      '--null[terminate records with NUL]' \
+      '--filesystem=[select a filesystem]:directory:_directories' \
+      '--older-than=[select older entries]:duration:(30d 12h 90m 10s)' \
+      '--newer-than=[select newer entries]:duration:(30d 12h 90m 10s)' \
+      '--sort=[select sort field]:sort field:(name date size path)' \
+      '--reverse[reverse the ordering]'
+    ;;
+  info)
+    _arguments -s -S $global_options '*:entry ID:'
+    ;;
+  restore)
+    _arguments -s -S $global_options \
+      '--to=[restore below a directory]:directory:_directories' \
+      '--conflict=[select conflict policy]:policy:(fail rename)' \
+      '--parents[create missing destination parents]' \
+      '--dry-run[report without changing anything]' \
+      '*:entry ID:'
+    ;;
+  purge)
+    _arguments -s -S $global_options \
+      '--dry-run[report without changing anything]' \
+      '--yes[confirm permanent deletion]' \
+      '--progress=-[show processed entry counts]::progress mode:(auto always never)' \
+      '*:entry ID:'
+    ;;
+  empty)
+    _arguments -s -S $global_options \
+      '--filesystem=[select a filesystem]:directory:_directories' \
+      '--older-than=[select older entries]:duration:(30d 12h 90m 10s)' \
+      '--dry-run[report without changing anything]' \
+      '--yes[confirm permanent deletion]' \
+      '--progress=-[show processed entry counts]::progress mode:(auto always never)'
+    ;;
+  doctor)
+    _arguments -s -S $global_options \
+      '--repair-cache[rebuild directory size caches]' \
+      '--recover-orphans=[move recoverable orphans]:directory:_directories' \
+      '--dry-run[report repairs without changing anything]'
+    ;;
+  completions)
+    _arguments -s -S \
+      '--help[display help and exit]' \
+      '--version[display version and exit]' \
+      '1:shell:(bash zsh fish)' \
+      '2:command:(rmu rmuctl)'
+    ;;
+esac

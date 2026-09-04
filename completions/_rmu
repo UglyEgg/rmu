@@ -1,0 +1,19 @@
+#compdef rmu
+
+_arguments -s -S \
+  '(-f --force)'{-f,--force}'[ignore nonexistent files and never prompt]' \
+  '-i[prompt before every top-level operand]' \
+  '-I[prompt once for more than three operands or recursive removal]' \
+  '--interactive=-[set prompt policy]::prompt policy:(never once always)' \
+  '(-d --dir)'{-d,--dir}'[permanently remove empty directories]' \
+  '--one-file-system[refuse a directory containing nested mounts]' \
+  '--no-preserve-root[disable the GNU root policy]' \
+  '--preserve-root=-[preserve filesystem roots]::mode:(all)' \
+  '(-r -R --recursive)'{-r,-R,--recursive}'[allow directory operands]' \
+  '(-v --verbose)'{-v,--verbose}'[explain successful actions]' \
+  '--trash[explicitly select recoverable Trash mode]' \
+  '--delegate[delegate all other arguments to GNU rm]' \
+  '--rmu-progress=-[show rate ETA and summary]::progress mode:(auto always never)' \
+  '--help[display help and exit]' \
+  '--version[display version and exit]' \
+  '*:file:_files'

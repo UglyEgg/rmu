@@ -1,0 +1,213 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release input (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86-64
+            architecture: x86_64
+            runner: ubuntu-24.04
+          - name: AArch64
+            architecture: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate immutable source and version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          version=$(sed -n 's/^version = "\([0-9][0-9.]*\)"$/\1/p' Cargo.toml | sed -n '1p')
+          test "$TAG" = "v$version"
+      - name: Check scripts and minimum supported Rust version
+        run: |
+          shellcheck tools/*.sh packaging/*.sh
+          for script in tools/*.sh packaging/*.sh; do
+            sh -n "$script"
+          done
+          tools/test-artifact-identity.sh
+          tools/test-release-plumbing.sh
+          tools/test-release-tag.sh
+          tools/verify-benchmark-evidence.sh
+          tools/verify-release-inventory.sh
+          rustup toolchain install 1.85.0 --profile minimal
+          cargo +1.85.0 check --all-targets --locked
+      - name: Check Rust formatting, lint, and tests
+        run: |
+          mkdir -p work
+          tools/write-source-manifest.sh > work/host-source-before
+          rustup component add rustfmt clippy
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --all-targets --locked
+          tools/write-source-manifest.sh > work/host-source-after
+          cmp work/host-source-before work/host-source-after
+      - name: Build and compare static binaries
+        run: |
+          tools/build-musl-container.sh --engine docker --no-cache --output work/musl
+          tools/build-musl-container.sh --engine docker --no-cache --output work/musl-check
+          test "$(tools/verify-musl-bundle.sh work/musl .)" = "${{ matrix.architecture }}"
+          cmp work/musl/current/rmu work/musl-check/current/rmu
+          cmp work/musl/current/rmuctl work/musl-check/current/rmuctl
+          cmp work/musl/current/SOURCE-SHA256SUMS work/musl-check/current/SOURCE-SHA256SUMS
+          cmp work/musl/current/RUNTIME-SHA256SUMS work/musl-check/current/RUNTIME-SHA256SUMS
+          tools/test-musl-verifier.sh work/musl .
+      - name: Build and compare RPM and DEB packages
+        run: |
+          tools/build-packages-container.sh --engine docker --no-cache --musl-dir work/musl --output work/packages --maintainer 'UglyEgg <UglyEgg@users.noreply.github.com>'
+          tools/build-packages-container.sh --engine docker --no-cache --musl-dir work/musl-check --output work/packages-check --maintainer 'UglyEgg <UglyEgg@users.noreply.github.com>'
+          cmp work/packages/current/*.rpm work/packages-check/current/*.rpm
+          cmp work/packages/current/*.deb work/packages-check/current/*.deb
+          cmp work/packages/current/PACKAGE-FILES work/packages-check/current/PACKAGE-FILES
+      - name: Install and exercise RPM and DEB packages
+        run: tools/test-packages-container.sh --engine docker --packages-dir work/packages
+      - name: Build and compare release archives
+        run: |
+          tools/build-release-bundles.sh --musl-dir work/musl --output work/release
+          tools/build-release-bundles.sh --musl-dir work/musl-check --output work/release-check
+          diff -u work/release/current/RELEASE-SHA256SUMS work/release-check/current/RELEASE-SHA256SUMS
+      - name: Seal per-commit release input
+        run: |
+          tools/write-source-manifest.sh > work/host-source-final
+          cmp work/host-source-before work/host-source-final
+          printf '%s\n' "$SOURCE_SHA" > work/SOURCE-COMMIT
+          tar -C work -czf "release-input-${{ matrix.architecture }}.tar.gz" SOURCE-COMMIT musl packages release
+      - name: Upload immutable release input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-input-${{ matrix.architecture }}-${{ github.sha }}
+          path: release-input-${{ matrix.architecture }}.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish-draft:
+    name: Verify complete release and create draft
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.sha }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check out immutable source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Download both native release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: release-input-*-${{ github.sha }}
+          path: work/downloads
+          merge-multiple: true
+      - name: Verify commit-bound inputs and assemble assets
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p work/input/x86_64 work/input/aarch64 work/assets work/sealed
+          tar -xzf work/downloads/release-input-x86_64.tar.gz -C work/input/x86_64
+          tar -xzf work/downloads/release-input-aarch64.tar.gz -C work/input/aarch64
+          version=${TAG#v}
+          . tools/artifact-identity.sh
+          for architecture in x86_64 aarch64; do
+            base=work/input/$architecture
+            test "$(cat "$base/SOURCE-COMMIT")" = "$SOURCE_SHA"
+            musl=work/sealed/$architecture
+            test "$(stage_verified_musl_bundle "$base/musl" "$musl" . tools/verify-musl-bundle.sh)" = "$architecture"
+            (cd "$base/packages/current" && sha256sum -c SHA256SUMS)
+            (cd "$base/release/current" && sha256sum -c RELEASE-SHA256SUMS)
+            cp "$musl/rmu" "work/assets/rmu-$version-$architecture-linux-musl"
+            cp "$musl/rmuctl" "work/assets/rmuctl-$version-$architecture-linux-musl"
+            cp "$base/release/current/rmu-$version-$architecture-linux-musl.tar.gz" work/assets/
+            cp "$base/packages/current/"*.rpm "$base/packages/current/"*.deb work/assets/
+            prefix=$(printf '%s' "$architecture" | tr '[:lower:]' '[:upper:]')
+            cp "$musl/BUILD-INFO.txt" "work/assets/$prefix-BUILD-INFO.txt"
+            cp "$base/packages/current/PACKAGE-BUILD-INFO.txt" "work/assets/$prefix-PACKAGE-BUILD-INFO.txt"
+            cp "$base/packages/current/PACKAGE-FILES" "work/assets/$prefix-PACKAGE-FILES"
+          done
+          cmp work/sealed/x86_64/SOURCE-SHA256SUMS work/sealed/aarch64/SOURCE-SHA256SUMS
+          cmp work/sealed/x86_64/RUNTIME-SHA256SUMS work/sealed/aarch64/RUNTIME-SHA256SUMS
+          cmp work/input/x86_64/release/current/rmu-$version-source.tar.gz work/input/aarch64/release/current/rmu-$version-source.tar.gz
+          cp work/sealed/x86_64/SOURCE-SHA256SUMS work/assets/
+          cp work/sealed/x86_64/RUNTIME-SHA256SUMS work/assets/
+          cp work/input/x86_64/release/current/rmu-$version-source.tar.gz work/assets/
+          cp LICENSE work/assets/RMU-LICENSE
+          cp licenses/Rust-* work/assets/
+          cp licenses/musl-1.2.5-COPYRIGHT work/assets/
+          cp docs/upstream-notices.md work/assets/UPSTREAM-NOTICES.md
+          printf 'source-git-revision=%s\n' "$SOURCE_SHA" > work/assets/RELEASE-COMMIT.txt
+          (cd work/assets && sha256sum \
+            "rmu-$version-x86_64-linux-musl" "rmuctl-$version-x86_64-linux-musl" \
+            "rmu-$version-aarch64-linux-musl" "rmuctl-$version-aarch64-linux-musl" \
+            X86_64-BUILD-INFO.txt AARCH64-BUILD-INFO.txt RMU-LICENSE Rust-* \
+            musl-1.2.5-COPYRIGHT UPSTREAM-NOTICES.md SOURCE-SHA256SUMS RUNTIME-SHA256SUMS \
+            RELEASE-COMMIT.txt > DIRECT-BINARY-SHA256SUMS)
+          (cd work/assets && sha256sum *.rpm *.deb *-PACKAGE-BUILD-INFO.txt *-PACKAGE-FILES > PACKAGE-SHA256SUMS)
+          (cd work/assets && sha256sum *.tar.gz > RELEASE-SHA256SUMS)
+          (cd work/assets && sha256sum -c DIRECT-BINARY-SHA256SUMS && sha256sum -c PACKAGE-SHA256SUMS && sha256sum -c RELEASE-SHA256SUMS)
+      - name: Create one commit-bound draft release
+        run: |
+          tools/verify-release-tag.sh "$TAG" "$SOURCE_SHA"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "a GitHub release already exists for $TAG; refusing to replace it" >&2
+            exit 1
+          fi
+          attempt_marker="rmu-release-attempt:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+          cp docs/release-notes.md work/release-notes.md
+          printf '\n<!-- %s -->\n' "$attempt_marker" >> work/release-notes.md
+          cleanup_failed_draft() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              release_json=$(gh release view "$TAG" --json isDraft,body 2>/dev/null || :)
+              is_draft=$(printf '%s' "$release_json" | jq -r '.isDraft // false')
+              body=$(printf '%s' "$release_json" | jq -r '.body // ""')
+              if [ "$is_draft" = true ] && printf '%s' "$body" | grep -Fq "$attempt_marker"; then
+                gh release delete "$TAG" --yes \
+                  || echo "could not remove the failed attempt-owned draft release" >&2
+              fi
+            fi
+            exit "$status"
+          }
+          trap cleanup_failed_draft EXIT
+          gh release create "$TAG" \
+            --verify-tag \
+            --target "$SOURCE_SHA" \
+            --generate-notes \
+            --notes-file work/release-notes.md \
+            --draft
+          gh release upload "$TAG" work/assets/*
+          mkdir -p work/release-readback
+          gh release download "$TAG" --dir work/release-readback
+          find work/assets -maxdepth 1 -type f -printf '%f\n' | sort > work/assets.expected
+          find work/release-readback -maxdepth 1 -type f -printf '%f\n' | sort > work/assets.actual
+          cmp work/assets.expected work/assets.actual
+          while IFS= read -r asset; do
+            cmp "work/assets/$asset" "work/release-readback/$asset"
+          done < work/assets.expected
+          tools/verify-release-tag.sh "$TAG" "$SOURCE_SHA"
+          trap - EXIT

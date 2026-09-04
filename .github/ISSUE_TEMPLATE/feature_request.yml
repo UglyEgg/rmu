@@ -1,0 +1,60 @@
+name: Feature request
+description: Propose a focused RMU or rmuctl enhancement
+title: "[Feature]: "
+labels:
+  - enhancement
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: Describe the user problem first. Command syntax is easier to evaluate once the intended workflow and safety boundary are clear.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Area
+      options:
+        - rmu compatibility or Trash behavior
+        - rmuctl management
+        - Progress or output
+        - Packaging or installation
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What workflow is difficult or impossible today, and who encounters it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the observable result. Example commands are welcome but not required.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: How do you handle this now, and why is that insufficient?
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Compatibility and safety impact
+      description: Consider GNU rm compatibility, recovery, permanent deletion, overwrite behavior, cross-filesystem work, and new persistent state.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Request checks
+      options:
+        - label: I checked the README, documentation, and existing issues for this request.
+          required: true

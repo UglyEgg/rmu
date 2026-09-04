@@ -1,0 +1,33 @@
+[package]
+name = "rmu"
+version = "0.7.1"
+edition = "2024"
+rust-version = "1.85"
+description = "Recoverable Move Utility: a dependency-free GNU rm-compatible FreeDesktop Trash command"
+license = "MIT"
+homepage = "https://github.com/UglyEgg/rmu"
+repository = "https://github.com/UglyEgg/rmu"
+readme = "README.md"
+publish = false
+keywords = ["trash", "rm", "freedesktop", "cli"]
+categories = ["command-line-utilities", "filesystem"]
+
+[[bin]]
+name = "rmu"
+path = "src/main.rs"
+
+[[bin]]
+name = "rmuctl"
+path = "src/bin/rmuctl.rs"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

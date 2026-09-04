@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability or data-loss risk
+    url: https://github.com/UglyEgg/rmu/security/advisories/new
+    about: Report security-sensitive behavior privately instead of opening a public issue.
+  - name: Usage and compatibility documentation
+    url: https://github.com/UglyEgg/rmu/tree/main/docs
+    about: Review the detailed behavior and safety documentation before filing an issue.

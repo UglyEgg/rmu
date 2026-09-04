@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  msrv:
+    name: Rust 1.85 compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check minimum supported Rust version
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal
+          cargo +1.85.0 check --all-targets --locked
+
+  release-path:
+    name: Release path (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86-64
+            runner: ubuntu-24.04
+          - name: AArch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check scripts
+        run: |
+          shellcheck tools/*.sh packaging/*.sh
+          for script in tools/*.sh packaging/*.sh; do
+            sh -n "$script"
+          done
+          tools/test-artifact-identity.sh
+          tools/test-release-plumbing.sh
+          tools/test-release-tag.sh
+          tools/verify-benchmark-evidence.sh
+          tools/verify-release-inventory.sh
+      - name: Check Rust formatting, lint, and tests
+        run: |
+          mkdir -p work
+          tools/write-source-manifest.sh > work/host-source-before
+          rustup component add rustfmt clippy
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --all-targets --locked
+          tools/write-source-manifest.sh > work/host-source-after
+          cmp work/host-source-before work/host-source-after
+      - name: Build and test static binaries twice without cache
+        run: |
+          tools/build-musl-container.sh --engine docker --no-cache --output work/ci-musl-a
+          tools/build-musl-container.sh --engine docker --no-cache --output work/ci-musl-b
+          cmp work/ci-musl-a/current/rmu work/ci-musl-b/current/rmu
+          cmp work/ci-musl-a/current/rmuctl work/ci-musl-b/current/rmuctl
+          cmp work/ci-musl-a/current/SOURCE-SHA256SUMS work/ci-musl-b/current/SOURCE-SHA256SUMS
+          cmp work/ci-musl-a/current/RUNTIME-SHA256SUMS work/ci-musl-b/current/RUNTIME-SHA256SUMS
+          tools/test-musl-verifier.sh work/ci-musl-a .
+          mkdir -p work/benchmark-publication
+          printf 'report sentinel' > work/report-sentinel
+          printf 'raw sentinel' > work/raw-sentinel
+          ln -s ../report-sentinel work/benchmark-publication/REPORT.md
+          ln -s ../raw-sentinel work/benchmark-publication/raw.tsv
+          tools/benchmark.sh --rmu work/ci-musl-a/current/rmu --gnu-rm /usr/bin/rm --runs 1 --tree-files 2 --output work/benchmark-publication
+          test "$(cat work/report-sentinel)" = 'report sentinel'
+          test "$(cat work/raw-sentinel)" = 'raw sentinel'
+          test -f work/benchmark-publication/REPORT.md
+          test ! -L work/benchmark-publication/REPORT.md
+          test -f work/benchmark-publication/raw.tsv
+          test ! -L work/benchmark-publication/raw.tsv
+      - name: Build and compare RPM and DEB packages
+        run: |
+          tools/build-packages-container.sh --engine docker --no-cache --musl-dir work/ci-musl-a --output work/ci-packages-a
+          tools/build-packages-container.sh --engine docker --no-cache --musl-dir work/ci-musl-b --output work/ci-packages-b
+          cmp work/ci-packages-a/current/*.rpm work/ci-packages-b/current/*.rpm
+          cmp work/ci-packages-a/current/*.deb work/ci-packages-b/current/*.deb
+          cmp work/ci-packages-a/current/PACKAGE-FILES work/ci-packages-b/current/PACKAGE-FILES
+      - name: Install and exercise RPM and DEB packages
+        run: tools/test-packages-container.sh --engine docker --packages-dir work/ci-packages-a
+      - name: Build and compare release archives
+        run: |
+          tools/build-release-bundles.sh --musl-dir work/ci-musl-a --output work/release-a
+          tools/build-release-bundles.sh --musl-dir work/ci-musl-b --output work/release-b
+          TAR_OPTIONS=--exclude=README.md tools/build-release-bundles.sh --musl-dir work/ci-musl-a --output work/release-hostile-env
+          diff -u work/release-a/current/RELEASE-SHA256SUMS work/release-b/current/RELEASE-SHA256SUMS
+          diff -u work/release-a/current/RELEASE-SHA256SUMS work/release-hostile-env/current/RELEASE-SHA256SUMS
+          mkdir -p work/source-check
+          tar -xzf work/release-a/current/rmu-*-source.tar.gz -C work/source-check
+          (cd work/source-check/rmu-*-source && cargo check --all-targets --locked --offline)
+      - name: Verify source remained unchanged
+        run: |
+          tools/write-source-manifest.sh > work/host-source-final
+          cmp work/host-source-before work/host-source-final
