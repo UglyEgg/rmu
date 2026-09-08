@@ -8,8 +8,8 @@ data-safety fixes.
 ## Reporting a vulnerability
 
 Use [GitHub private vulnerability reporting](https://github.com/UglyEgg/rmu/security/advisories/new).
-The repository owner must enable that facility before making the repository
-public. If the link is unexpectedly unavailable, do not disclose security
+Private vulnerability reporting is enabled for this public repository. If the
+link is unexpectedly unavailable, do not disclose security
 details in public: open a minimal issue that only asks the owner to restore a
 private reporting channel.
 
