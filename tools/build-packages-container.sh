@@ -200,7 +200,8 @@ fi
 image_id=$(sed -n '1p' "$image_id_file")
 require_container_image_id "$image_id"
 
-container_id=$("$engine" create "$image_id")
+# Docker requires a command even though this container is never started.
+container_id=$("$engine" create "$image_id" /bin/true)
 "$engine" cp "$container_id:/artifacts/." "$staging_directory"
 "$engine" rm "$container_id" >/dev/null
 container_id=
