@@ -27,18 +27,18 @@ chmod 0755 "$temporary/fake-gh"
 
 commit=$(git -C "$repository" rev-parse --verify HEAD)
 GITHUB_REPOSITORY=example/rmu RMU_GH_COMMAND="$temporary/fake-gh" \
-    FAKE_COMMIT=$commit "$script_directory/verify-release-tag.sh" v0.7.1 "$commit"
+    FAKE_COMMIT=$commit "$script_directory/verify-release-tag.sh" v0.7.2 "$commit"
 GITHUB_REPOSITORY=example/rmu RMU_GH_COMMAND="$temporary/fake-gh" \
     FAKE_TAG_KIND=tag FAKE_COMMIT=$commit \
-    "$script_directory/verify-release-tag.sh" v0.7.1 "$commit"
+    "$script_directory/verify-release-tag.sh" v0.7.2 "$commit"
 if GITHUB_REPOSITORY=example/rmu RMU_GH_COMMAND="$temporary/fake-gh" \
     FAKE_COMMIT=0000000000000000000000000000000000000000 \
-    "$script_directory/verify-release-tag.sh" v0.7.1 "$commit" >/dev/null 2>&1; then
+    "$script_directory/verify-release-tag.sh" v0.7.2 "$commit" >/dev/null 2>&1; then
     echo "accepted a release tag targeting the wrong commit" >&2
     exit 1
 fi
 
-for unsafe_tag in v0.7.1/other v0.7.1@other v0.7.1:other; do
+for unsafe_tag in v0.7.2/other v0.7.2@other v0.7.2:other; do
     if GITHUB_REPOSITORY=example/rmu RMU_GH_COMMAND="$temporary/fake-gh" \
         FAKE_COMMIT=$commit \
         "$script_directory/verify-release-tag.sh" "$unsafe_tag" "$commit" \
@@ -51,7 +51,7 @@ done
 for invalid_repository in example example/rmu/other example+owner/rmu example/; do
     if GITHUB_REPOSITORY=$invalid_repository RMU_GH_COMMAND="$temporary/fake-gh" \
         FAKE_COMMIT=$commit \
-        "$script_directory/verify-release-tag.sh" v0.7.1 "$commit" \
+        "$script_directory/verify-release-tag.sh" v0.7.2 "$commit" \
         >/dev/null 2>&1; then
         echo "accepted invalid repository: $invalid_repository" >&2
         exit 1

@@ -1,6 +1,6 @@
 [package]
 name = "rmu"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2024"
 rust-version = "1.85"
 description = "Recoverable Move Utility: a dependency-free GNU rm-compatible FreeDesktop Trash command"

@@ -1,4 +1,4 @@
-# RMU 0.7.1 release safety notes
+# RMU 0.7.2 release safety notes
 
 ## Safety boundaries
 

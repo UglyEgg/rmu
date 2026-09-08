@@ -16,7 +16,7 @@ body:
     attributes:
       label: RMU version
       description: Paste the output of `rmu --version` or `rmuctl --version`.
-      placeholder: rmu 0.7.1
+      placeholder: rmu 0.7.2
     validations:
       required: true
 

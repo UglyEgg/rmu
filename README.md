@@ -29,7 +29,7 @@ does not maintain a private Trash database.
 
 ## Install
 
-Release 0.7.1 provides RPM, DEB, and static musl archives for x86-64 and
+Release 0.7.2 provides RPM, DEB, and static musl archives for x86-64 and
 AArch64 Linux on [GitHub Releases](https://github.com/UglyEgg/rmu/releases).
 Download the package and its checksum manifest, then verify it before install:
 
@@ -37,10 +37,10 @@ Download the package and its checksum manifest, then verify it before install:
 sha256sum -c --ignore-missing PACKAGE-SHA256SUMS
 
 # Fedora/RHEL, x86-64
-sudo dnf install ./rmu-0.7.1-1.x86_64.rpm
+sudo dnf install ./rmu-0.7.2-1.x86_64.rpm
 
 # Debian/Ubuntu, x86-64
-sudo apt install ./rmu_0.7.1-1_amd64.deb
+sudo apt install ./rmu_0.7.2-1_amd64.deb
 ```
 
 The AArch64 package names end in `.aarch64.rpm` and `_arm64.deb`. Packages
@@ -51,10 +51,10 @@ The static archive works without a package manager:
 
 ```sh
 sha256sum -c --ignore-missing RELEASE-SHA256SUMS
-tar -xzf rmu-0.7.1-x86_64-linux-musl.tar.gz
+tar -xzf rmu-0.7.2-x86_64-linux-musl.tar.gz
 sudo install -m 0755 \
-  rmu-0.7.1-x86_64-linux-musl/bin/rmu \
-  rmu-0.7.1-x86_64-linux-musl/bin/rmuctl \
+  rmu-0.7.2-x86_64-linux-musl/bin/rmu \
+  rmu-0.7.2-x86_64-linux-musl/bin/rmuctl \
   /usr/local/bin/
 ```
 

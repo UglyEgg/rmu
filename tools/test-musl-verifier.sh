@@ -27,6 +27,12 @@ case $architecture in
     *) echo "unexpected verified architecture: $architecture" >&2; exit 1 ;;
 esac
 
+mkdir -p "$temporary/unusable-objcopy"
+printf '%s\n' '#!/bin/sh' 'exit 99' > "$temporary/unusable-objcopy/objcopy"
+chmod 0755 "$temporary/unusable-objcopy/objcopy"
+PATH="$temporary/unusable-objcopy:$PATH" \
+    "$script_directory/verify-musl-bundle.sh" "$bundle" "$source_root" >/dev/null
+
 reset_fixture() {
     rm -rf -- "$fixture"
     mkdir -p "$fixture"

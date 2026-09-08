@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 - 2026-09-08
+
+- Make embedded build-identity verification architecture-neutral by reading
+  the ELF section with `readelf` instead of host-native `objcopy`, and test
+  that verification succeeds when `objcopy` is unavailable. This lets the
+  x86-64 release assembler validate sealed AArch64 binaries without weakening
+  the commit, source-manifest, runtime-manifest, or ELF-architecture checks.
+- Supersede the protected but unreleased `v0.7.1` tag after its final assembly
+  gate exposed that cross-architecture tooling error. No 0.7.1 GitHub release
+  or draft was published.
+
 ## 0.7.1 - 2026-09-04
 
 - Require a shared `.Trash` directory to be sticky and owned by root or the

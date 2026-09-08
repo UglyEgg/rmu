@@ -64,7 +64,7 @@ if [ ! -x "$bundle_directory/rmu" ] || [ ! -x "$bundle_directory/rmuctl" ]; then
     echo "musl binaries are not executable" >&2
     exit 1
 fi
-for command_name in readelf objcopy sha256sum; do
+for command_name in readelf sha256sum; do
     command -v "$command_name" >/dev/null 2>&1 \
         || { echo "$command_name is required to verify musl bundles" >&2; exit 1; }
 done
@@ -113,8 +113,13 @@ inspect_binary() {
         echo "$binary requires a shared library" >&2
         exit 1
     fi
-    objcopy --dump-section ".rmu.build=$identity_file" "$binary" 2>/dev/null \
+    identity_dump=$(readelf -p .rmu.build "$binary" 2>/dev/null) \
         || { echo "$binary has no readable embedded RMU build identity" >&2; exit 1; }
+    printf '%s\n' "$identity_dump" \
+        | sed -n \
+            -e 's/^  \[[[:space:]0-9a-fA-F][[:space:]0-9a-fA-F]*\]  //p' \
+            -e 's/^            //p' \
+        | sed 's/\\n$//' > "$identity_file"
     [ "$(wc -l < "$identity_file" | tr -d ' ')" -eq 4 ] \
         || { echo "$binary has a malformed embedded RMU build identity" >&2; exit 1; }
     [ "$(sed -n '1p' "$identity_file")" = RMU-BUILD-IDENTITY-V2 ] \

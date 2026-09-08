@@ -68,5 +68,5 @@ install -D -m 0644 /input/UPSTREAM-NOTICES.md %{buildroot}%{_docdir}/rmu/UPSTREA
 %doc %{_docdir}/rmu/UPSTREAM-NOTICES.md
 
 %changelog
-* Fri Sep 04 2026 RMU contributors - %{rmu_version}-%{rmu_release}
+* Tue Sep 08 2026 RMU contributors - %{rmu_version}-%{rmu_release}
 - Package the static commands, manuals, and shell completions.

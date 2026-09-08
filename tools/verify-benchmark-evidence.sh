@@ -13,7 +13,7 @@ source_root=${1:-.}
 script_directory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 source_root=$(CDPATH='' cd -- "$source_root" && pwd)
 report=$source_root/docs/benchmarks.md
-raw=$source_root/docs/benchmark-data/0.7.1/raw.tsv
+raw=$source_root/docs/benchmark-data/0.7.2/raw.tsv
 temporary=$(mktemp -d "${TMPDIR:-/tmp}/rmu-benchmark-evidence.XXXXXX")
 cleanup() {
     rm -rf -- "$temporary"
