@@ -103,8 +103,10 @@ prune_artifact_generations() {
             .rmu-generation.*) ;;
             *) echo "refusing an unexpected generation path: $_rmu_candidate" >&2; return 1 ;;
         esac
-        [ ! -L "$_rmu_candidate" ] && [ -d "$_rmu_candidate" ] \
-            || { echo "refusing an unsafe generation path: $_rmu_candidate" >&2; return 1; }
+        if [ -L "$_rmu_candidate" ] || [ ! -d "$_rmu_candidate" ]; then
+            echo "refusing an unsafe generation path: $_rmu_candidate" >&2
+            return 1
+        fi
         if [ "$_rmu_name" != "$_rmu_current" ] && [ "$_rmu_name" != "$_rmu_previous" ]; then
             rm -rf -- "$_rmu_candidate"
         fi

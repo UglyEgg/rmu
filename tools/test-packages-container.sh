@@ -90,8 +90,10 @@ if [ -L "$packages_directory/current" ]; then
 fi
 
 build_info=$packages_directory/PACKAGE-BUILD-INFO.txt
-[ -f "$build_info" ] && [ ! -L "$build_info" ] \
-    || { echo "missing or unsafe package build information" >&2; exit 1; }
+if [ ! -f "$build_info" ] || [ -L "$build_info" ]; then
+    echo "missing or unsafe package build information" >&2
+    exit 1
+fi
 architecture=$(sed -n 's/^architecture=//p' "$build_info")
 version=$(sed -n 's/^version=//p' "$build_info")
 case $architecture in
@@ -106,8 +108,10 @@ case $architecture in
     *) echo "unsupported package architecture: $architecture" >&2; exit 1 ;;
 esac
 for package in "$rpm_file" "$deb_file"; do
-    [ -f "$packages_directory/$package" ] && [ ! -L "$packages_directory/$package" ] \
-        || { echo "missing or unsafe package artifact: $package" >&2; exit 1; }
+    if [ ! -f "$packages_directory/$package" ] || [ -L "$packages_directory/$package" ]; then
+        echo "missing or unsafe package artifact: $package" >&2
+        exit 1
+    fi
 done
 (cd "$packages_directory" && sha256sum -c SHA256SUMS)
 

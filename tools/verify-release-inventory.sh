@@ -12,8 +12,10 @@ cd -- "$source_root"
 LC_ALL=C
 export LC_ALL
 
-[ -f release-files.txt ] && [ ! -L release-files.txt ] \
-    || { echo "release-files.txt is missing or unsafe" >&2; exit 1; }
+if [ ! -f release-files.txt ] || [ -L release-files.txt ]; then
+    echo "release-files.txt is missing or unsafe" >&2
+    exit 1
+fi
 
 temporary=$(mktemp -d "${TMPDIR:-/tmp}/rmu-release-inventory.XXXXXX")
 cleanup() {

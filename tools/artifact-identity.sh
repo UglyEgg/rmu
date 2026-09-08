@@ -61,8 +61,10 @@ stage_verified_musl_bundle() {
         echo "refusing a non-link musl current generation" >&2
         return 1
     fi
-    [ ! -e "$_rmu_destination" ] && [ ! -L "$_rmu_destination" ] \
-        || { echo "verified musl staging destination already exists" >&2; return 1; }
+    if [ -e "$_rmu_destination" ] || [ -L "$_rmu_destination" ]; then
+        echo "verified musl staging destination already exists" >&2
+        return 1
+    fi
     mkdir -m 0700 -- "$_rmu_destination"
     cp -a "$_rmu_selected/." "$_rmu_destination/"
     "$_rmu_verifier" "$_rmu_destination" "$_rmu_repository"

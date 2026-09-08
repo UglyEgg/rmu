@@ -60,8 +60,10 @@ for artifact in rmu rmuctl BUILD-INFO.txt SOURCE-SHA256SUMS RUNTIME-SHA256SUMS S
         exit 1
     fi
 done
-[ -x "$bundle_directory/rmu" ] && [ -x "$bundle_directory/rmuctl" ] \
-    || { echo "musl binaries are not executable" >&2; exit 1; }
+if [ ! -x "$bundle_directory/rmu" ] || [ ! -x "$bundle_directory/rmuctl" ]; then
+    echo "musl binaries are not executable" >&2
+    exit 1
+fi
 for command_name in readelf objcopy sha256sum; do
     command -v "$command_name" >/dev/null 2>&1 \
         || { echo "$command_name is required to verify musl bundles" >&2; exit 1; }
